@@ -8,7 +8,8 @@ int main(int argc, char *argv[]) {
 		exit(0);
 	}*/
 	LoadBalancerProperties LoadBalancer;
+	InitLoadBalancer(&LoadBalancer);
 	CreateSocketsBindAndListen(&LoadBalancer);
-	//ConnectToPortsAndListen(&LoadBalancer);
+	HandleTraffic(&LoadBalancer);
 	return SUCCESS_CODE;
 }

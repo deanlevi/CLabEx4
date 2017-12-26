@@ -9,16 +9,28 @@
 #define MAX_PORT_NUM 64000
 #define MIN_PORT_NUM 1024
 #define BINDING_SUCCEEDED 0
+#define LISTEN_SUCCEEDED 0
+#define NUM_OF_SERVERS 3
+#define ACCEPT_FAILED -1
+#define BUFFER_SIZE 400 // todo check
+#define SEND_RECEIVE_FLAGS 0
+//todo check it's ok that all defines are here
+
 
 typedef struct _LoadBalancerProperties {
-	SOCKET ServerPortSocket; // todo check SOCKET
-	struct sockaddr_in ServerPortService;
-	SOCKET HttpPortSocket; // todo check int
-	struct sockaddr_in HttpPortService;
+	SOCKET ListeningServerPortSocket; // todo check SOCKET
+	struct sockaddr_in ListeningServerPortService;
+	SOCKET ListeningHttpPortSocket; // todo check int
+	struct sockaddr_in ListeningHttpPortService;
 
+	SOCKET HttpPortSocket;
+	SOCKET ServerSockets[NUM_OF_SERVERS];
+
+	int CurrentServerSocket;
 } LoadBalancerProperties;
 
-void CreateSockets(LoadBalancerProperties *LoadBalancer);
-void ConnectToPortsAndListen(LoadBalancerProperties *LoadBalancer);
+void InitLoadBalancer(LoadBalancerProperties *LoadBalancer);
+void CreateSocketsBindAndListen(LoadBalancerProperties *LoadBalancer);
+void HandleTraffic(LoadBalancerProperties *LoadBalancer);
 
 #endif
