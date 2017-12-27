@@ -1,4 +1,4 @@
-#pragma comment(lib,  "ws2_32.lib") // todo check
+//#pragma comment(lib,  "ws2_32.lib") // todo check
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +21,8 @@ void HandleAcceptFromHttpPort(LoadBalancerProperties *LoadBalancer);
 void HandleAcceptFromServerPort(LoadBalancerProperties *LoadBalancer);
 void ReceiveAndSendData(SOCKET SendingSocket, SOCKET ReceivingSocket,
 						LoadBalancerProperties *LoadBalancer, bool SendToServerPort);
+void CheckIfGotWholeMessage(char *WholeReceivedBuffer, bool *FinishedReceiveAndSend,
+							bool SendToServerPort, int *NumberOfEndIndicationsFound);
 void CloseSockets(LoadBalancerProperties *LoadBalancer);
 void CloseSocketsAndExit(LoadBalancerProperties *LoadBalancer, bool CloseSocketsEnable);
 
@@ -153,20 +155,25 @@ void ReceiveAndSendData(SOCKET SendingSocket, SOCKET ReceivingSocket,
 	int SentBytes = 0;
 	int SumOfSentBytes = 0;
 	int LeftBytesToSend = 0;
-	int EndIndicationsCounter = 0;
 	bool FinishedReceiveAndSend = false;
-	char ReceivedBuffer[BUFFER_SIZE];
+	char CurrentReceivedBuffer[BUFFER_SIZE];
 	char *ReceivedBufferSendingPosition = NULL;
 
+	char *WholeReceivedBuffer = malloc(sizeof(char) * (BUFFER_SIZE + 1) );
+	int SizeOfWholeReceivedBuffer = BUFFER_SIZE;
+	int IndexInWholeReceivedBuffers = 0;
+	bool NeedToReallocWholeBuffer = false;
+	int NumberOfEndIndicationsFound = 0;
+
 	while (!FinishedReceiveAndSend) {
-		ReceivedBytes = recv(SendingSocket, ReceivedBuffer, BUFFER_SIZE, SEND_RECEIVE_FLAGS);
+		ReceivedBytes = recv(SendingSocket, CurrentReceivedBuffer, BUFFER_SIZE, SEND_RECEIVE_FLAGS);
 		if (ReceivedBytes == SOCKET_ERROR) {
 			int ErrorNumber = WSAGetLastError(); // todo check problem with this
 			printf("ReceiveAndSendData failed to recv.\nError Number is %d\n", ErrorNumber);
 			CloseSocketsAndExit(LoadBalancer, true);
 		}
-		while (SentBytes < ReceivedBytes) {
-			ReceivedBufferSendingPosition = ReceivedBuffer;
+		ReceivedBufferSendingPosition = CurrentReceivedBuffer;
+		while (SumOfSentBytes < ReceivedBytes) {
 			LeftBytesToSend = ReceivedBytes - SumOfSentBytes;
 			SentBytes = send(ReceivingSocket, ReceivedBufferSendingPosition, LeftBytesToSend, SEND_RECEIVE_FLAGS);
 			if (SentBytes == SOCKET_ERROR) {
@@ -179,23 +186,41 @@ void ReceiveAndSendData(SOCKET SendingSocket, SOCKET ReceivingSocket,
 		}
 		SentBytes = 0;
 		SumOfSentBytes = 0;
-		UpdateEndIndications(ReceivedBuffer, &EndIndicationsCounter);
-		if ((EndIndicationsCounter == 1 && SendToServerPort) || EndIndicationsCounter >= 2) {
-			FinishedReceiveAndSend = true;
+
+		NeedToReallocWholeBuffer = IndexInWholeReceivedBuffers + ReceivedBytes > SizeOfWholeReceivedBuffer;
+		if (NeedToReallocWholeBuffer) {
+			SizeOfWholeReceivedBuffer += BUFFER_SIZE;
+			WholeReceivedBuffer = (char*) realloc(WholeReceivedBuffer, SizeOfWholeReceivedBuffer);
 		}
+		IndexInWholeReceivedBuffers += ReceivedBytes;
+		strcat(WholeReceivedBuffer, CurrentReceivedBuffer);
+
+		CheckIfGotWholeMessage(WholeReceivedBuffer, &FinishedReceiveAndSend, SendToServerPort, &NumberOfEndIndicationsFound);
 	}
 }
 
-void UpdateEndIndications(char ReceivedBuffer[BUFFER_SIZE], int *EndIndicationsCounter) {
-	char *EndIndicationPositionInBuffer = strstr(ReceivedBuffer, "\r\n\r\n");
-	if (EndIndicationPositionInBuffer != NULL) {
-		*EndIndicationsCounter ++;
-		char *RunningOverFirstIndication = "XXXX";
-		strncpy(EndIndicationPositionInBuffer, RunningOverFirstIndication, 4);
+void CheckIfGotWholeMessage(char *WholeReceivedBuffer, bool *FinishedReceiveAndSend,
+							bool SendToServerPort, int *NumberOfEndIndicationsFound) {
+	char *EndIndicationPositionInBuffer = strstr(WholeReceivedBuffer, "\r\n\r\n");
+	bool FoundEndIndication = EndIndicationPositionInBuffer != NULL;
+	
+	if (!FoundEndIndication) {
+		return;
 	}
-	EndIndicationPositionInBuffer = strstr(ReceivedBuffer, "\r\n\r\n");
-	if (EndIndicationPositionInBuffer != NULL) {
-		*EndIndicationsCounter++;
+	(*NumberOfEndIndicationsFound)++;
+	if (SendToServerPort || *NumberOfEndIndicationsFound == 2) {
+		*FinishedReceiveAndSend = true;
+		return;
+	}
+
+	char *RunningOverFirstIndication = "XXXX";
+	strncpy(EndIndicationPositionInBuffer, RunningOverFirstIndication, 4);
+	EndIndicationPositionInBuffer = strstr(WholeReceivedBuffer, "\r\n\r\n");
+	FoundEndIndication = EndIndicationPositionInBuffer != NULL;
+
+	if (FoundEndIndication) {
+		*FinishedReceiveAndSend = true;
+		return;
 	}
 }
 
@@ -212,7 +237,8 @@ void CloseSockets(LoadBalancerProperties *LoadBalancer) {
 void CloseOneSocket(SOCKET Socket) {
 	int CloseSocketReturnValue;
 	if (Socket != INVALID_SOCKET) {
-		CloseSocketReturnValue = closesocket(Socket);
+		//CloseSocketReturnValue = closesocket(Socket);
+		CloseSocketReturnValue = close(Socket); // todo check close
 		if (CloseSocketReturnValue == SOCKET_ERROR) {
 			int ErrorNumber = WSAGetLastError(); // todo check problem with this
 			printf("CloseOneSocket failed to close socket.\nError Number is %d\n", ErrorNumber);

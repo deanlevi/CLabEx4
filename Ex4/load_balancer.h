@@ -1,8 +1,9 @@
 #ifndef LOAD_BALANCER_H
 #define LOAD_BALANCER_H
 
-#include <WinSock2.h>
-
+#include <WinSock2.h> // todo remove
+//#include <sys/socket.h> // todo verify
+#include <sys/types.h>
 
 #define ERROR_CODE -1
 #define SUCCESS_CODE 0
@@ -12,7 +13,7 @@
 #define LISTEN_SUCCEEDED 0
 #define NUM_OF_SERVERS 3
 #define ACCEPT_FAILED -1
-#define BUFFER_SIZE 400 // todo check
+#define BUFFER_SIZE 100 // todo check
 #define SEND_RECEIVE_FLAGS 0
 //todo check it's ok that all defines are here
 
