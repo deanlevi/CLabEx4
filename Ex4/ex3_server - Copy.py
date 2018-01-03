@@ -6,7 +6,7 @@ NUMBER_OF_SERVERS = 3
 
 BUFFER_SIZE = 100
 
-SERVER_PORT_FILE_NAME = "server_port.txt"
+SERVER_PORT_FILE_NAME = "server_port"
 
 COUNTER_RESPONSE = "HTTP/1.0 200 OK\r\nContent-Type: " + \
                    "text/html\r\nContent-Length: " + \
@@ -38,7 +38,7 @@ def SendCounterResponse(CurrentActiveServer, CurrentActiveServerRequestCounter):
     CurrentActiveServer.send(ResponseToSendToLoadBalancer) # todo check its ok to assume all was sent
 
 def SendNotFoundResponse(CurrentActiveServer):
-    CurrentActiveServer.send(NOT_FOUND_RESPONSE)
+    CurrentActiveServer.send(NOT_FOUND_RESPONSE) # todo check its ok to assume all was sent
 
 def ReceiveAndSend(Servers):
     ServersRequestCounter = [0, 0, 0]
@@ -59,6 +59,7 @@ def ReceiveAndSend(Servers):
                                 ServersRequestCounter[CurrentActiveServerIndex])
         else:
             SendNotFoundResponse(Servers[CurrentActiveServerIndex])
+        
         CurrentActiveServerIndex = (CurrentActiveServerIndex + 1) % 3
     return
 
