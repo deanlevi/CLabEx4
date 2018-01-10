@@ -7,22 +7,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <stdbool.h>
 
-#define ERROR_CODE -1
-#define SOCKET_ERROR -1
-#define INVALID_SOCKET (int) (~0)
 #define SUCCESS_CODE 0
-#define MAX_PORT_NUM 64000
-#define MIN_PORT_NUM 1024
-#define SERVER_ADDRESS_STR "127.0.0.1"
-#define BINDING_SUCCEEDED 0
-#define LISTEN_SUCCEEDED 0
 #define NUMBER_OF_SERVERS 3
-#define ACCEPT_FAILED -1
-#define BUFFER_SIZE 100 // todo check
-#define SEND_RECEIVE_FLAGS 0
-//todo check it's ok that all defines are here
-
 
 typedef struct _LoadBalancerProperties {
 	int ListeningServerPortSocket; // todo check SOCKET

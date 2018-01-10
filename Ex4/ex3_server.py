@@ -1,8 +1,7 @@
-#!/usr/bin/python2.7 -tt
+#!/usr/bin/python2.7
 
+import sys
 import socket
-
-NUMBER_OF_SERVERS = 3
 
 BUFFER_SIZE = 100
 
@@ -17,33 +16,31 @@ NOT_FOUND_RESPONSE = "HTTP/1.1 404 Not Found\r\n" + \
                      "Sorry, the object you requested was not found.\r\n" + \
                      "</body></html>\r\n"
 
-def ConnectToLoadBalancer(Servers, LoadBalancerPort):
-    for Server in range(NUMBER_OF_SERVERS):
-        Server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        Server.connect(('127.0.0.1', LoadBalancerPort)) # todo verify
-        Servers.append(Server);
-    return Servers
+def ConnectToLoadBalancer(LoadBalancerPort):
+    Server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    Server.connect(('127.0.0.1', LoadBalancerPort)) # todo verify
+    print "python - connected to server" # todo remove
+    return Server
 
-def CreateCounterResponse(CurrentActiveServerRequestCounter):
-    LengthOfCurrentActiveServerRequestCounter = len(str(CurrentActiveServerRequestCounter))
+def CreateCounterResponse(ServerRequestCounter):
+    LengthOfServerRequestCounter = len(str(ServerRequestCounter))
     ResponseToSendToLoadBalancer = COUNTER_RESPONSE % \
-                    (LengthOfCurrentActiveServerRequestCounter, CurrentActiveServerRequestCounter)
+                    (LengthOfServerRequestCounter, ServerRequestCounter)
     return ResponseToSendToLoadBalancer
 
-def SendResponseToLoadBalancer(ResponseToSend, CurrentActiveServer):
+def SendResponseToLoadBalancer(ResponseToSend, Server):
     BytesToSend = len(ResponseToSend)
     TotalSentBytes = 0
     while TotalSentBytes <= BytesToSend:
-        CurrentSentBytes = CurrentActiveServer.send(ResponseToSend[TotalSentBytes:])
+        CurrentSentBytes = Server.send(ResponseToSend[TotalSentBytes:])
         TotalSentBytes += CurrentSentBytes
 
 def ReceiveAndSend(Servers):
-    ServersRequestCounter = [0, 0, 0]
-    CurrentActiveServerIndex = 0
+    ServerRequestCounter = 0
     while(True):
         CurrentRequest = ""
         while "\r\n\r\n" not in CurrentRequest:
-            CurrentRequest += CurrentActiveServerIndex.recv(BUFFER_SIZE)
+            CurrentRequest += Server.recv(BUFFER_SIZE)
         FirstLineInCurrentRequest = (CurrentRequest.splitlines())[0]
         FirstLineInCurrentRequestAsArrayOfWords = FirstLineInCurrentRequest.split(" ")
         IndexInFirstLine = 0
@@ -51,21 +48,17 @@ def ReceiveAndSend(Servers):
             IndexInFirstLine += 1;
         GotCounterRequest = FirstLineInCurrentRequestAsArrayOfWords[IndexInFirstLine + 1] == "/counter"
         if GotCounterRequest:
-            ServersRequestCounter[CurrentActiveServerIndex] += 1
-            ResponseToSend = CreateCounterResponse(ServersRequestCounter[CurrentActiveServerIndex])
+            ServerRequestCounter += 1
+            ResponseToSend = CreateCounterResponse(ServerRequestCounter)
         else:
             ResponseToSend = NOT_FOUND_RESPONSE
-        SendResponseToLoadBalancer(ResponseToSend, Servers[CurrentActiveServerIndex])
-        CurrentActiveServerIndex = (CurrentActiveServerIndex + 1) % 3
+        SendResponseToLoadBalancer(ResponseToSend, Server)
     return
 
 def main():
-    Servers = []
     LoadBalancerPort = int(sys.argv[1])
-    ConnectToLoadBalancer(Servers, LoadBalancerPort)
-    ReceiveAndSend(Servers)
-    print Servers # todo remove
-    print LoadBalancerPort # todo remove
+    Server = ConnectToLoadBalancer(LoadBalancerPort)
+    ReceiveAndSend(Server)
     return
 
 if __name__ == "__main__":
